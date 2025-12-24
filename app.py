@@ -16,6 +16,11 @@ from streamlit.errors import StreamlitSecretNotFoundError
 import seaborn as sns
 import matplotlib.pyplot as plt
 import json
+import logging
+
+# configure basic logger so messages show in Streamlit Cloud logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 try:
     from kaggle.api.kaggle_api_extended import KaggleApi
@@ -32,6 +37,7 @@ def ensure_kaggle_config():
     kaggle_dir = os.environ.get('KAGGLE_CONFIG_DIR', str(Path.cwd()))
 
     if kaggle_username and kaggle_key:
+        logger.info('Kaggle credentials found in environment, writing kaggle.json to %s', kaggle_dir)
         os.environ['KAGGLE_CONFIG_DIR'] = kaggle_dir
         os.makedirs(kaggle_dir, exist_ok=True)
         kaggle_json_path = Path(kaggle_dir) / 'kaggle.json'
@@ -46,7 +52,10 @@ def ensure_kaggle_config():
         # If user already set KAGGLE_CONFIG_DIR to a folder containing kaggle.json, respect it
         kg_dir = os.environ.get('KAGGLE_CONFIG_DIR')
         if kg_dir and (Path(kg_dir) / 'kaggle.json').exists():
+            logger.info('Using existing kaggle.json in KAGGLE_CONFIG_DIR: %s', kg_dir)
             os.environ['KAGGLE_CONFIG_DIR'] = kg_dir
+        else:
+            logger.info('No Kaggle credentials or kaggle.json found; download will not be available without credentials')
 
 # Run at import time so download_dataset() can authenticate
 ensure_kaggle_config()
@@ -70,14 +79,19 @@ def download_dataset():
     """Try to download and unzip the Olist dataset using Kaggle API."""
     if not KAGGLE_AVAILABLE:
         st.warning("Kaggle API not available. Please place CSVs inside the `data/` folder.")
+        logger.error('Kaggle package is not installed in this environment')
         return False
 
     api = KaggleApi()
     try:
+        logger.info('Authenticating with Kaggle API...')
         api.authenticate()
+        logger.info('Starting dataset download to %s', DATA_DIR)
         api.dataset_download_files('olistbr/brazilian-ecommerce', path=str(DATA_DIR), unzip=True)
+        logger.info('Dataset download complete')
         return True
     except Exception as e:
+        logger.exception('Kaggle download failed')
         st.warning(f"Kaggle download failed: {e}")
         return False
 
@@ -202,36 +216,69 @@ def main():
 
     st.sidebar.header('Dataset & Settings')
     st.sidebar.write('Data directory: ', str(DATA_DIR))
+
     if missing_files:
         st.warning('Missing dataset files: ' + ', '.join(missing_files))
 
-        if KAGGLE_AVAILABLE:
-            st.info('Kaggle API is available. You can provide credentials via environment variables or Streamlit secrets.')
-            if st.button('Download dataset from Kaggle'):
-                with st.spinner('Downloading dataset from Kaggle...'):
-                    ok = download_dataset()
-                    if ok:
-                        st.success('Download finished. Please re-run (Rerun) the app.')
-                        st.experimental_rerun()
-                    else:
-                        st.error('Download failed. Check logs in terminal for details.')
+        # Diagnostics expander
+        with st.expander('Diagnostics & Fixes'):
+            st.write('Steps to fix:')
+            st.write('1. Add Kaggle credentials in **App → Settings → Secrets** (two separate entries).')
+            st.write('2. Click **Try Download (Kaggle)** below (requires secrets).')
+            st.write('3. Or upload `brazilian-ecommerce.zip` into `data/` and use the Unzip button.')
 
-        # If there is a zip of the dataset present, allow unzip
-        zips = list(DATA_DIR.glob('*.zip'))
-        if zips:
-            for z in zips:
-                st.info(f'Found zip: {z.name}')
-            if st.button('Unzip dataset files found in data/'):
-                with st.spinner('Unzipping...'):
-                    for z in zips:
-                        try:
-                            import zipfile
-                            with zipfile.ZipFile(z, 'r') as zip_ref:
-                                zip_ref.extractall(DATA_DIR)
-                            st.success(f'Unzipped {z.name}')
-                        except Exception as e:
-                            st.error(f'Failed to unzip {z.name}: {e}')
-                    st.experimental_rerun()
+            st.markdown('**Secrets example (TOML, do not paste JSON):**')
+            st.code('''KAGGLE_USERNAME = "your_kaggle_username"
+KAGGLE_KEY = "your_kaggle_key"''', language='toml')
+
+            # Show current content of data/ for debugging
+            try:
+                files_in_data = sorted([p.name for p in DATA_DIR.glob('*')])
+            except Exception:
+                files_in_data = []
+            st.write('Files currently in `data/`:', files_in_data if files_in_data else 'No files found')
+
+            # Manual unzip action
+            zips = list(DATA_DIR.glob('*.zip'))
+            if zips:
+                for z in zips:
+                    st.info(f'Found zip: {z.name}')
+                if st.button('Unzip dataset files found in data/'):
+                    with st.spinner('Unzipping...'):
+                        for z in zips:
+                            try:
+                                with zipfile.ZipFile(z, 'r') as zip_ref:
+                                    zip_ref.extractall(DATA_DIR)
+                                st.success(f'Unzipped {z.name}')
+                            except Exception as e:
+                                st.error(f'Failed to unzip {z.name}: {e}')
+                        st.experimental_rerun()
+
+            # Try Download using Kaggle (requires Kaggle API and valid secrets)
+            st.markdown('---')
+            if not KAGGLE_AVAILABLE:
+                st.error('Kaggle API package not installed on this instance. Automatic download not available.')
+            else:
+                st.write('Kaggle package is available.')
+                secret_note = st.empty()
+                if not (k_username and k_key):
+                    secret_note.warning('No Kaggle credentials found. Add them in App → Settings → Secrets as two entries: `KAGGLE_USERNAME` and `KAGGLE_KEY`.')
+                if st.button('Try Download (Kaggle)'):
+                    if not (k_username and k_key):
+                        st.error('Kaggle credentials missing. Add secrets first.')
+                    else:
+                        out = st.empty()
+                        with out.container():
+                            st.info('Starting download...')
+                            try:
+                                ok = download_dataset()
+                                if ok:
+                                    st.success('Download finished. Re-running the app to pick up files...')
+                                    st.experimental_rerun()
+                                else:
+                                    st.error('Download attempted but reported failure. Check logs below or run locally with kaggle CLI.')
+                            except Exception as e:
+                                st.error(f'Download failed with error: {e}')
 
         st.info('Alternative: download dataset manually from Kaggle and place CSVs under `data/`')
         st.stop()
