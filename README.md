@@ -47,3 +47,8 @@ streamlit run app.py
 - Metode pembayaran yang paling populer dan berkontribusi besar ke revenue adalah **credit_card**.
 - Terdapat variasi performa seller; beberapa negara bagian (misalnya SP) memiliki jumlah order tinggi, sementara beberapa lain memiliki rata-rata waktu pengiriman lebih cepat.
 
+**Keamanan & kredensial**
+- Jangan commit `kaggle.json` atau `.streamlit/secrets.toml` ke GitHub.
+- Jika kamu sempat commit `kaggle.json` ke repo remote, segera regenerate API key di Kaggle (https://www.kaggle.com/me/account) dan replace the old key in Streamlit Cloud Secrets.
+- Contoh file untuk testing lokal ada di `.streamlit/secrets.toml.example` — salin dan isi `.streamlit/secrets.toml` untuk pengujian lokal.
+
