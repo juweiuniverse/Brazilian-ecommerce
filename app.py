@@ -12,6 +12,7 @@ import warnings
 
 import pandas as pd
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 import seaborn as sns
 import matplotlib.pyplot as plt
 import json
@@ -171,14 +172,25 @@ def main():
     st.set_page_config(page_title='Olist E-Commerce Dashboard', layout='wide')
     st.title('Olist - Brazilian E-Commerce')
 
-    # If running on Streamlit Cloud, write kaggle.json from st.secrets
-    if 'KAGGLE_USERNAME' in st.secrets and 'KAGGLE_KEY' in st.secrets:
+    # Safely read secrets from Streamlit (works on Cloud and local)
+    try:
+        k_username = st.secrets.get('KAGGLE_USERNAME') if hasattr(st, 'secrets') else None
+        k_key = st.secrets.get('KAGGLE_KEY') if hasattr(st, 'secrets') else None
+    except StreamlitSecretNotFoundError:
+        k_username = None
+        k_key = None
+    except Exception:
+        # Any other parsing issue or missing file — treat as no secrets
+        k_username = None
+        k_key = None
+
+    if k_username and k_key:
         kg_dir = os.environ.get('KAGGLE_CONFIG_DIR', '/tmp')
         os.makedirs(kg_dir, exist_ok=True)
         kaggle_json_path = Path(kg_dir) / 'kaggle.json'
         if not kaggle_json_path.exists():
             with open(kaggle_json_path, 'w') as f:
-                json.dump({"username": st.secrets['KAGGLE_USERNAME'], "key": st.secrets['KAGGLE_KEY']}, f)
+                json.dump({"username": k_username, "key": k_key}, f)
             try:
                 kaggle_json_path.chmod(0o600)
             except Exception:
