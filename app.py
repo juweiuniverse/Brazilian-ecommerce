@@ -60,6 +60,19 @@ def ensure_kaggle_config():
 # Run at import time so download_dataset() can authenticate
 ensure_kaggle_config()
 
+# Helper to safely trigger a rerun; some Streamlit runtime versions may not expose experimental_rerun
+def safe_rerun():
+    try:
+        st.experimental_rerun()
+    except Exception as e:
+        logger.warning('st.experimental_rerun not available or failed: %s', e)
+        # Fall back to instructing the user to manually reload the page
+        try:
+            st.info('Download finished — please refresh the page (browser reload or press R) to load the new files.')
+        except Exception:
+            # If Streamlit UI not available (unlikely in runtime), just log
+            logger.info('Prompt user to refresh the page to pick up downloaded files.')
+
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -252,19 +265,7 @@ KAGGLE_KEY = "your_kaggle_key"''', language='toml')
                                 st.success(f'Unzipped {z.name}')
                             except Exception as e:
                                 st.error(f'Failed to unzip {z.name}: {e}')
-                        st.experimental_rerun()
-
-            # Try Download using Kaggle (requires Kaggle API and valid secrets)
-            st.markdown('---')
-            if not KAGGLE_AVAILABLE:
-                st.error('Kaggle API package not installed on this instance. Automatic download not available.')
-            else:
-                st.write('Kaggle package is available.')
-                secret_note = st.empty()
-                if not (k_username and k_key):
-                    secret_note.warning('No Kaggle credentials found. Add them in App → Settings → Secrets as two entries: `KAGGLE_USERNAME` and `KAGGLE_KEY`.')
-                if st.button('Try Download (Kaggle)'):
-                    if not (k_username and k_key):
+                        safe_rerun()
                         st.error('Kaggle credentials missing. Add secrets first.')
                     else:
                         out = st.empty()
@@ -274,7 +275,7 @@ KAGGLE_KEY = "your_kaggle_key"''', language='toml')
                                 ok = download_dataset()
                                 if ok:
                                     st.success('Download finished. Re-running the app to pick up files...')
-                                    st.experimental_rerun()
+                                    safe_rerun()
                                 else:
                                     st.error('Download attempted but reported failure. Check logs below or run locally with kaggle CLI.')
                             except Exception as e:
