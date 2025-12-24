@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+data/
+.kaggle/
+kaggle.json
+.streamlit/secrets.toml
+.DS_Store
+*.pyc
