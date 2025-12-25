@@ -33,22 +33,14 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-**Cara deploy ke Streamlit Cloud**
-1. Push repo ke GitHub (pastikan `requirements.txt` ada). Jangan commit `kaggle.json`.
-2. Di Streamlit Cloud, buat App baru dan pilih `app.py` sebagai file utama.
-3. Tambahkan Secrets (Settings → Secrets):
-   - `KAGGLE_USERNAME` = your_kaggle_username
-   - `KAGGLE_KEY` = your_kaggle_key
-4. Deploy dan re-run app.
+**Untuk melihat secara online dapat mengakses: https://brazilian-ecommerce-olist6.streamlit.app/**
 
 **Ringkasan insight hasil analisis**
-- Produk terlaris tidak selalu memberikan revenue tertinggi — ada produk dengan volume besar namun unit price rendah.
+- Produk terlaris tidak selalu memberikan revenue tertinggi, ada produk dengan volume besar namun unit price rendah.
 - Keterlambatan pengiriman cenderung menurunkan rata-rata `review_score` (kepuasan pelanggan).
 - Metode pembayaran yang paling populer dan berkontribusi besar ke revenue adalah **credit_card**.
 - Terdapat variasi performa seller; beberapa negara bagian (misalnya SP) memiliki jumlah order tinggi, sementara beberapa lain memiliki rata-rata waktu pengiriman lebih cepat.
 
 **Keamanan & kredensial**
-- Jangan commit `kaggle.json` atau `.streamlit/secrets.toml` ke GitHub.
-- Jika kamu sempat commit `kaggle.json` ke repo remote, segera regenerate API key di Kaggle (https://www.kaggle.com/me/account) dan replace the old key in Streamlit Cloud Secrets.
 - Contoh file untuk testing lokal ada di `.streamlit/secrets.toml.example` — salin dan isi `.streamlit/secrets.toml` untuk pengujian lokal.
 
