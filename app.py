@@ -12,7 +12,7 @@ import warnings
 
 import pandas as pd
 import streamlit as st
-from streamlit.errors import StreamlitSecretNotFoundError
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import json
@@ -203,11 +203,8 @@ def main():
     try:
         k_username = st.secrets.get('KAGGLE_USERNAME') if hasattr(st, 'secrets') else None
         k_key = st.secrets.get('KAGGLE_KEY') if hasattr(st, 'secrets') else None
-    except StreamlitSecretNotFoundError:
-        k_username = None
-        k_key = None
     except Exception:
-        # Any other parsing issue or missing file — treat as no secrets
+        # Any parsing issue or missing file — treat as no secrets
         k_username = None
         k_key = None
 
@@ -266,6 +263,18 @@ KAGGLE_KEY = "your_kaggle_key"''', language='toml')
                             except Exception as e:
                                 st.error(f'Failed to unzip {z.name}: {e}')
                         safe_rerun()
+
+            # Try Download using Kaggle (requires Kaggle API and valid secrets)
+            st.markdown('---')
+            if not KAGGLE_AVAILABLE:
+                st.error('Kaggle API package not installed on this instance. Automatic download not available.')
+            else:
+                st.write('Kaggle package is available.')
+                secret_note = st.empty()
+                if not (k_username and k_key):
+                    secret_note.warning('No Kaggle credentials found. Add them in App → Settings → Secrets as two entries: `KAGGLE_USERNAME` and `KAGGLE_KEY`.')
+                if st.button('Try Download (Kaggle)'):
+                    if not (k_username and k_key):
                         st.error('Kaggle credentials missing. Add secrets first.')
                     else:
                         out = st.empty()
@@ -280,7 +289,6 @@ KAGGLE_KEY = "your_kaggle_key"''', language='toml')
                                     st.error('Download attempted but reported failure. Check logs below or run locally with kaggle CLI.')
                             except Exception as e:
                                 st.error(f'Download failed with error: {e}')
-
         st.info('Alternative: download dataset manually from Kaggle and place CSVs under `data/`')
         st.stop()
 
